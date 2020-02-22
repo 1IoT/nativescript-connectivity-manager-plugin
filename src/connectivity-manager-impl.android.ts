@@ -150,13 +150,9 @@ export class ConnectivityManagerImpl extends Common implements ConnectivityManag
         try {
             let networkId: number = this.addNetwork(ssid, password);
 
-            console.log("Connecting to Wifi: ssid:" + ssid + " pw:" + password + " networkId:" + networkId);
-
             this.disconnectWifiNetwork().then(()=>{
                 this.wifiManager.enableNetwork(networkId, true);
                 this.wifiManager.reconnect();
-
-                console.log("Connecting to networkId " + networkId + " ...");
             });
 
             return await this.waitUntilConnectedToWifi(milliseconds);
@@ -177,13 +173,9 @@ export class ConnectivityManagerImpl extends Common implements ConnectivityManag
             // Register receiver to listen if the network state changes
             application.android.registerBroadcastReceiver(WifiManager.NETWORK_STATE_CHANGED_ACTION, () => {
 
-                console.log("Network state changed");
-
                 // Only when the network has disconnected, start the process to unregister the receiver and return
                 // "true" for a successfully disconnected network
                 if (!this.isWifiConnected()) {
-
-                    console.log("Network is disconnected: " + !this.isWifiConnected());
 
                     application.android.unregisterBroadcastReceiver(WifiManager.NETWORK_STATE_CHANGED_ACTION);
                     resolve(this.isWifiConnected());
@@ -247,8 +239,6 @@ export class ConnectivityManagerImpl extends Common implements ConnectivityManag
      * to prevent reconnecting.
      */
     private disconnectWifiAndRemoveNetwork(): void {
-
-        console.log("Disconnect networkId " + this.getWifiNetworkId() + " ...");
 
         // Prevents reconnecting to the network by removing the Wifi configuration
         this.wifiManager.removeNetwork(this.getWifiNetworkId());
