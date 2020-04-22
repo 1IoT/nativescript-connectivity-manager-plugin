@@ -9,10 +9,16 @@ import TelephonyManagerService = android.telephony.TelephonyManager;
 import WifiManagerService = android.net.wifi.WifiManager;
 import LocationManagerService = android.location.LocationManager;
 import List = java.util.List;
-import WifiManager = android.net.wifi.WifiManager;
+import NetworkRequest = android.net.NetworkRequest;
+import NetworkCapabilities = android.net.NetworkCapabilities;
+import WifiNetworkSpecifier = android.net.wifi.WifiNetworkSpecifier;
+import Network = android.net.Network;
+
 
 /**
  * It manages the connectivity API of an Android mobile device.
+ * This is especially thought for applications where an app needs to connect to a Wi-Fi AP for P2P communication.
+ * It allows also to switch back to a network with internet connection to also to internet requests.
  */
 export class ConnectivityManagerImpl extends Common implements ConnectivityManagerInterface {
     private readonly WIFI_SSID_BLACKLIST = ['', ' '];
@@ -23,8 +29,17 @@ export class ConnectivityManagerImpl extends Common implements ConnectivityManag
     private readonly locationManager: LocationManagerService = application.android.context.getSystemService(Context.LOCATION_SERVICE);
     private readonly connectivityManager: ConnectivityManagerService = application.android.context.getSystemService(Context.CONNECTIVITY_SERVICE);
 
+    // a "handle" to disconnect the forced network connection
+    private forcedNetworkCallback: ConnectivityManagerService.NetworkCallback;
+
+    // information about the previously (originally) connected network
+    private previousConnectionMetered = false;
+    private previousConnectionWiFi = false;
+    private previousSsid: string = undefined;
+
+
     /**
-     * Each wifi has a SSID, used to identify the network.
+     * Each Wi-Fi has a SSID, used to identify the network.
      *
      * @requires location permission granted of the user.
      * @returns the SSID of the current network or <unknown ssid> if the location permission is not granted.
@@ -47,23 +62,26 @@ export class ConnectivityManagerImpl extends Common implements ConnectivityManag
     }
 
     /**
-     * @returns true if the wifi connectivity setting of the mobile device is enabled.
+     * @returns true if the Wi-Fi connectivity setting of the mobile device is enabled.
      */
     public isWifiEnabled(): boolean {
         return this.wifiManager.isWifiEnabled()
     }
 
     /**
-     * @returns true if the mobile device is connected to a wifi network.
+     * WiFi Connected?
+     *
+     * API LEVEL 21
+     *
+     * @returns true if the mobile device is connected to a Wi-Fi network.
      */
     public isWifiConnected(): boolean {
         if (!this.isWifiEnabled()) {
             throw new Error("Wifi is not enabled.");
         }
 
-        let wifi = this.connectivityManager.getNetworkInfo(ConnectivityManagerService.TYPE_WIFI);
-
-        return wifi.isConnected();
+        return this.connectivityManager.getNetworkCapabilities(this.connectivityManager.getActiveNetwork()).
+            hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
     }
 
     /**
@@ -74,6 +92,10 @@ export class ConnectivityManagerImpl extends Common implements ConnectivityManag
     }
 
     /**
+     * Mobile connected?
+     *
+     * API LEVEL 21
+     *
      * @returns true if the mobile device is connected to a cellular network.
      */
     public isCellularConnected(): boolean {
@@ -81,9 +103,8 @@ export class ConnectivityManagerImpl extends Common implements ConnectivityManag
             throw new Error("Cellular is not enabled.");
         }
 
-        let cellular = this.connectivityManager.getNetworkInfo(ConnectivityManagerService.TYPE_MOBILE);
-
-        return cellular.isConnected();
+        return this.connectivityManager.getNetworkCapabilities(this.connectivityManager.getActiveNetwork()).
+        hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR);
     }
 
     /**
@@ -101,10 +122,11 @@ export class ConnectivityManagerImpl extends Common implements ConnectivityManag
     }
 
     /**
-     * Scans the local area for Wifi access points and returns a list of all SSIDs.
+     * Scans the local area for Wi-Fi access points and returns a list of all SSIDs.
+     * TODO ctinnes has to be later substituted by another approach. I think, one has to get the scan results from the android system scans.
      *
      * @requires location permission granted of the user.
-     * @returns a string array of Wifi SSIDs.
+     * @returns a string array of Wi-Fi SSIDs.
      */
     public async scanWifiNetworks(): Promise<string[]> {
         return new Promise((resolve) => {
@@ -126,7 +148,6 @@ export class ConnectivityManagerImpl extends Common implements ConnectivityManag
                         wifiSsidList.push(wifi.SSID);
                     }
                 }
-
                 resolve(wifiSsidList);
             });
 
@@ -135,65 +156,237 @@ export class ConnectivityManagerImpl extends Common implements ConnectivityManag
     }
 
     /**
-     * Connects to a Wifi access point.
+     * Connects to a Wi-Fi access point.
+     * This will prompt for a user confirmation in the application.
      *
-     * @param ssid of the Wifi access point to be connected.
-     * @param password of the Wifi access point to be connected.
+     * API LEVEL 26
+     *
+     * @param ssid of the Wi-Fi access point to be connected.
+     * @param password of the Wi-Fi access point to be connected.
      * @param milliseconds that are available for the connection establishment.
      * @returns true if a connection could be established.
      */
     public async connectToWifiNetwork(ssid: string, password: string, milliseconds: number): Promise<boolean> {
-        if (!this.isWifiEnabled()) {
-            throw new Error("Wifi is not enabled.");
-        }
-
-        try {
-            let networkId: number = this.addNetwork(ssid, password);
-
-            this.disconnectWifiNetwork().then(()=>{
-                this.wifiManager.enableNetwork(networkId, true);
-                this.wifiManager.reconnect();
-            });
-
-            return await this.waitUntilConnectedToWifi(milliseconds);
-        } catch (error) {
-            throw new Error("Something went wrong wile connecting to the Wifi. + " + error);
-        }
-    }
-
-    /**
-     * Disconnects the connection to the current Wifi and listen to the network state until the status
-     * has changed to disconnected.
-     *
-     * @returns true if the network was successfully disconnected
-     */
-    public async disconnectWifiNetwork(): Promise<boolean> {
         return new Promise((resolve) => {
 
-            // Register receiver to listen if the network state changes
-            application.android.registerBroadcastReceiver(WifiManager.NETWORK_STATE_CHANGED_ACTION, () => {
+            // Check if the wifi is enabled since this is a request to a WiFi network
+            if (!this.isWifiEnabled()) {
+                throw new Error("Wi-Fi not enabled.");
+            }
 
-                // Only when the network has disconnected, start the process to unregister the receiver and return
-                // "true" for a successfully disconnected network
-                if (!this.isWifiConnected()) {
+            try {
+                // Connectivity manger in local variable to make it available in anonymous class (below)
+                let connectivityManager = this.connectivityManager;
 
-                    application.android.unregisterBroadcastReceiver(WifiManager.NETWORK_STATE_CHANGED_ACTION);
-                    resolve(this.isWifiConnected());
+                // Determine if the current connection is metered (used for later "reconnect")
+                this.previousConnectionMetered = connectivityManager.isActiveNetworkMetered();
+
+                /*
+                 * Determine if the current connection is a WiFi connection.
+                 * This allows later for more reliable "reconnect".
+                 */
+                if (this.isWifiConnected()) {
+                    this.previousConnectionWiFi = true;
+                    this.previousSsid = this.getSSID();
+                } else {
+                    this.previousConnectionWiFi = false;
+                    this.previousSsid = undefined;
                 }
 
-            });
+                //---------------------------------------------------------------------------
+                //-------- Begin - Setup the network request and callback -------------------
+                // the requested network specifier
+                let wifiNetworkSpecifier = new WifiNetworkSpecifier.Builder().setSsid(ssid)
+                    .setWpa2Passphrase(password).build();
 
-            this.disconnectWifiAndRemoveNetwork();
+                // the network request
+                let networkRequest = (new NetworkRequest.Builder()).addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                    .setNetworkSpecifier(wifiNetworkSpecifier).build();
+
+                // the callback
+                // network call back stored in class variable for later disconnect via {@link ConnectivityManagerService#unregisterNetworkCallback}
+                this.forcedNetworkCallback = new class RC extends ConnectivityManagerService.NetworkCallback {
+
+                    // requested networks become available
+                    onAvailable(network: android.net.Network): void {
+                        connectivityManager.bindProcessToNetwork(network);
+                        console.log("Connected to " + ssid);
+
+                        resolve(true);
+                    }
+
+                    // Network not available (timeout)
+                    onUnavailable(): void {
+                        super.onUnavailable();
+                        console.log("Ran into timeout.");
+                        resolve(false);
+                    }
+                };
+                //---------------------------------------------------------------------------
+                //---------- End - Setup the network request and callback -------------------
+
+                // Request the network with the given timeout
+                console.log("Connecting to the network...");
+                this.connectivityManager.requestNetwork(networkRequest, this.forcedNetworkCallback, milliseconds);
+            } catch (error) {
+                throw new Error("Something went wrong wile connecting to the WiFi. + " + error);
+            }
         });
     }
 
     /**
-     * Adds a Wifi configuration needed to connect to a network.
+     *  Checks if internet is currently available.
      *
-     * @param ssid of a Wifi access point to be configured.
-     * @param password of the Wifi access point to be configured.
+     *  @return true if {@link NetworkCapabilities.NET_CAPABILITY_INTERNET} is given.
+     */
+    public hasInternet(): boolean {
+        return ConnectivityManagerImpl.hasInternet(this.connectivityManager, this.connectivityManager.getActiveNetwork());
+    }
+
+    private static hasInternet(connectivityManager: ConnectivityManagerService, network: Network): boolean {
+        return connectivityManager.getNetworkCapabilities(network).hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+    }
+
+    /**
+     * Disconnects the connection to the current network and listens to the network state until the given timeout or reconnected
+     * to a network with internet.
+     *
+     * API LEVEL 26
+     *
+     * @returns true if the network successfully disconnected and reconnected to a network with {@link NetworkCapabilities.NET_CAPABILITY_INTERNET}.
+     */
+    public async disconnectWifiNetwork(timeoutMs: number): Promise<boolean> {
+        return new Promise((resolve) => {
+
+            let promiseTimeout = setTimeout(() => {
+                console.log("Ran into timeout when disconnecting and fetching new connection.");
+                resolve(false);
+            }, timeoutMs);
+
+            // class parameter redefinition because of scope problems in the anonymous network callback class
+            let connectivityManager = this.connectivityManager;
+            let wifiManager = this.wifiManager;
+            let previousNetworkMetered = this.previousConnectionMetered;
+            let previousNetworkWiFi = this.previousConnectionWiFi
+            let previousNetworkSsid = this.previousSsid;
+
+            /** Setting up the network callback to listen for the network changes. When disconnecting, the android system connects to some other networks before reaching the "final state".
+             * I don't know why this is the case, but we need some logic to determine the "stable" network and route further traffic to this stable network.
+             * We need to determine a new network with internet traffic, since after calling bindProcessToNetwork, android will not route app traffic automatically through a new network.
+             * We therefore need to find the previous network to route traffic through that network again.
+             */
+            let networkConnectivity = new class NC extends ConnectivityManagerService.NetworkCallback {
+
+                onAvailable(network: android.net.Network): void {
+
+                    ConnectivityManagerImpl.logConnectivityInfo(wifiManager, connectivityManager, network);
+
+                    if (ConnectivityManagerImpl.isPreviousOrStableNetwork(wifiManager, connectivityManager, network, previousNetworkMetered, previousNetworkWiFi, previousNetworkSsid)) {
+                        connectivityManager.bindProcessToNetwork(network);
+                        resolve(true);
+                        clearTimeout(promiseTimeout);
+                        // The network we are aiming for is "stable" so we can safely unregister the callback again.
+                        connectivityManager.unregisterNetworkCallback(this);
+                    }
+                }
+
+                onLost(network: android.net.Network): void {
+                    console.log("Disconnected.");
+                }
+            };
+
+            //Register the callback above
+            this.connectivityManager.registerNetworkCallback(new NetworkRequest.Builder().build(), networkConnectivity);
+
+            //Disconnect from the intentionally connected network
+            this.connectivityManager.unregisterNetworkCallback(this.forcedNetworkCallback);
+        });
+    }
+
+    /**
+     * This method implements some heuristics to determine if the given network is the"stable" network.
+     * TODO when you know a method to do this deterministically, please make a pull-request or open an issue.
+     *
+     * @param wifiManager the Wi-Fi manager
+     * @param connectivityManager the connectivity manager.
+     * @param network the given network
+     * @param previousNetworkMetered true if the previous network already had a metered connection.
+     * @param previousNetworkWiFi true if the previous network was a Wi-Fi network
+     * @param previousNetworkSsid the ssid of the previous network (if Wi-Fi).
+     */
+    private static isPreviousOrStableNetwork(wifiManager: WifiManagerService, connectivityManager: ConnectivityManagerService, network: Network,
+                                             previousNetworkMetered: boolean, previousNetworkWiFi: boolean,
+                                             previousNetworkSsid: string): boolean {
+
+        let isWifi = connectivityManager.getNetworkCapabilities(network).hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
+
+        // both Wi-Fi
+        if (previousNetworkWiFi && isWifi) {
+            // TODO from android 11 on, it will be possible to get the ssid from the network
+            let ssid = wifiManager.getConnectionInfo().getSSID();
+            return ssid == previousNetworkSsid;
+        // only previous Wi-Fi
+        } else if (previousNetworkWiFi) {
+            return false;
+        }
+
+        // No Wi-Fi previously
+        let meteredNow = !connectivityManager.getNetworkCapabilities(network).hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED);
+        let hasInternet = ConnectivityManagerImpl.hasInternet(connectivityManager, network);
+
+        // only connect if both networks were either both metered or both unmetered + internet is available
+        // TODO need to make the "has Internet" optional for other use cases
+        return  meteredNow == previousNetworkMetered && hasInternet;
+    }
+
+
+    /**
+     * Logs some information about the given {@link Network} and other connectivity information.
+     *
+     * API LEVEL 26
+     *
+     * @param wifiManager the Wi-Fi manager
+     * @param connectivityManager the connectivity manager
+     * @param network the {@link Network}.
+     */
+    private static logConnectivityInfo(wifiManager: WifiManagerService, connectivityManager: ConnectivityManagerService, network: Network): void {
+        let activeNetwork = connectivityManager.getActiveNetwork();
+        let defaultActive = connectivityManager.isDefaultNetworkActive();
+        let boundNetwork = connectivityManager.getBoundNetworkForProcess();
+        let allNetworks = connectivityManager.getAllNetworks();
+        // TODO from android 11 on, it will be possible to get the ssid from the network
+        let ssid = wifiManager.getConnectionInfo().getSSID();
+        console.log("Connected via " + ConnectivityManagerImpl.getInterfaceName(connectivityManager, network));
+        console.log("New network: " + network);
+        console.log("Active network: " + activeNetwork);
+
+
+
+        console.log("Active network adapter: " + ConnectivityManagerImpl.getInterfaceName(connectivityManager,activeNetwork));
+        console.log("Default is active?: " + defaultActive);
+        console.log("Current bound network: " + boundNetwork);
+        console.log("Current bound network adapter: " + ConnectivityManagerImpl.getInterfaceName(connectivityManager,boundNetwork));
+        console.log("All networks: " + allNetworks);
+        console.log("Current SSID:" + ssid);
+    }
+
+    private static getInterfaceName(connectivityManager: ConnectivityManagerService, activeNetwork: android.net.Network) {
+        let linkProperties = connectivityManager.getLinkProperties(activeNetwork);
+        if (linkProperties == null) {
+            return "";
+        }
+
+        return linkProperties.getInterfaceName();
+    }
+
+    /**
+     * Adds a Wi-Fi configuration needed to connect to a network.
+     *
+     * @param ssid of a Wi-Fi access point to be configured.
+     * @param password of the Wi-Fi access point to be configured.
      * @returns the networkId that is needed to connect to a network.
      */
+    @Deprecated
     private addNetwork(ssid: string, password: string): number {
         let config: WifiConfiguration = new WifiConfiguration();
         config.SSID = "\"" + ssid + "\"";
@@ -203,18 +396,19 @@ export class ConnectivityManagerImpl extends Common implements ConnectivityManag
     }
 
     /**
-     * Wait some seconds until connected to the Wifi.
+     * Wait some seconds until connected to the Wi-Fi.
      *
      * @param milliseconds in which the connection is to be established.
      * @returns true if the connection was made within the defined time.
      */
+    @Deprecated
     private async waitUntilConnectedToWifi(milliseconds: number): Promise<boolean> {
         return new Promise((resolve) => {
 
             // Checks every 1/2 second if a connection is established
             let intervalTimer = setInterval(() => {
 
-                // Stops the interval if the phone is connected to the Wifi
+                // Stops the interval if the phone is connected to the Wi-Fi
                 if(this.isWifiConnected()) {
                     clearInterval(intervalTimer);
                     clearTimeout(timeout);
@@ -226,7 +420,7 @@ export class ConnectivityManagerImpl extends Common implements ConnectivityManag
             let timeout = setTimeout(() => {
                 clearInterval(intervalTimer);
 
-                // Guarantees a consistent Wifi state after the timeout
+                // Guarantees a consistent Wi-Fi state after the timeout
                 this.disconnectWifiAndRemoveNetwork();
 
                 throw new Error("Could not connect in the allowed time.");
@@ -235,12 +429,13 @@ export class ConnectivityManagerImpl extends Common implements ConnectivityManag
     }
 
     /**
-     * Disconnects the connection to the current Wifi and remove the network from the wifiManager list
+     * Disconnects the connection to the current Wi-Fi and remove the network from the wifiManager list
      * to prevent reconnecting.
      */
+    @Deprecated
     private disconnectWifiAndRemoveNetwork(): void {
 
-        // Prevents reconnecting to the network by removing the Wifi configuration
+        // Prevents reconnecting to the network by removing the Wi-Fi configuration
         this.wifiManager.removeNetwork(this.getWifiNetworkId());
 
         this.wifiManager.disconnect();
