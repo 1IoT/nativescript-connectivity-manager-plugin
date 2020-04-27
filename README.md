@@ -33,12 +33,20 @@ npm run demo:android
 import {ConnectivityManagerImpl} from 'nativescript-connectivity-manager-plugin';
 
 @Component({
-    selector: "ns-app",
-    templateUrl: "app.component.html"
+    selector: "Home",
+    templateUrl: "./home.component.html"
 })
-export class AppComponent {
+export class HomeComponent implements OnInit {
 
-    constructor(private connectivityManager: ConnectivityManagerImpl) {
+    private static NETWORK_SSID: string = "MY_SSID";
+    private static NETWORK_PASSPHARSE: string = "MY_KEY";
+    private static CONNECTION_TIMEOUT_MS: number = 30000;
+    private static DISCONNECT_TIMEOUT_MS: number = 15000;
+
+    constructor(private connectivityManager: ConnectivityManagerImpl, private httpClient: HttpClient) {
+    }
+
+    ngOnInit(): void {
     }
 
     public getInfos() {
@@ -59,32 +67,21 @@ export class AppComponent {
         });
     }
 
-    public connect(): void {
+    public async connect(): Promise<boolean> {
         console.log("Start connection...");
         console.log("Disconnect with the source network...");
-        this.connectivityManager.connectToWifiNetwork("{SSID}", "{PW}", 10000).then((connected: boolean) => {
-            console.log("Connected with a new network: " + connected);
-        });
+        return this.connectivityManager.connectToWifiNetwork(HomeComponent.NETWORK_SSID, HomeComponent.NETWORK_PASSPHARSE, HomeComponent.CONNECTION_TIMEOUT_MS);
     }
 
-    public disconnect(): void {
-        this.connectivityManager.disconnectWifiNetwork(5000).then((disconnected) => {
-            console.log("Disconnected: " + disconnected);
-            console.log("Android automatically connects to the source network...");
-        });
+    public async disconnect(): Promise<boolean> {
+        return this.connectivityManager.disconnectWifiNetwork(HomeComponent.DISCONNECT_TIMEOUT_MS);
     }
 }
 
 ```
 
-## Wifi Workflow
-1. `connectToWifiNetwork()` Disconnects the source Wifi and connects to a new Wifi network
-2. `disconnectWifiNetwork()` Disconnects the current network. If the network was connected via this plugin, it will 
-remove the network from the wifiManager list, so Android cannot automatically reconnect to the network. If the network 
-to be disconnected was already connected before, Android will automatically reconnect to the network.
-
 ## API
-Requires **Android SDK**: 26
+Requires **Android SDK**: 29
 
 **WARNING: Note that even for scanning WiFi and retrieving the SSID, location permission must be given and GPS must be enabled!**
 
@@ -101,7 +98,7 @@ Requires **Android SDK**: 26
 | hasInternet() | boolean | 
 | async scanWifiNetworks() | Promise\<string[]\> | requires granted location permission and enabled gps  
 | async connectToWifiNetwork(ssid: string, password: string, milliseconds: number) | Promise\<boolean\> |  
-| async disconnectWifiNetworkByBroadcast(timeoutMs: number) | Promise\<boolean\>
+| async disconnectWifiNetwork(timeoutMs: number) | Promise\<boolean\>
 
 ## Tips
 

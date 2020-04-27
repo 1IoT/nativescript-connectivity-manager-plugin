@@ -65,12 +65,12 @@ export class HomeComponent implements OnInit {
         console.log("Response: " + JSON.stringify(result));
     }
 
-    private async performP2PCall():Promise<Object> {
+    private async performP2PCall(): Promise<Object> {
         console.log("Running P2P call.");
         return this.httpClient.get(HomeComponent.P2P_TEST_URL).toPromise();
     }
 
-    public async performInternetCall():Promise<Object> {
+    public async performInternetCall(): Promise<Object> {
         console.log("Running internet call.");
         return this.httpClient.get(HomeComponent.INTERNET_TEST_URL).toPromise();
     }

@@ -1,6 +1,6 @@
 {
 	"name": "nativescript-connectivity-manager-plugin",
-	"version": "0.0.3",
+	"version": "0.0.4",
 	"description": "This plugin provides a connectivity manager of Android and iOS.",
 	"main": "connectivity-manager-impl",
 	"typings": "index.d.ts",
@@ -22,6 +22,10 @@
 		"plugin:prepare": "npm run build && cd ../demo-angular && tns plugin remove nativescript-connectivity-manager-plugin && tns plugin add ../src && cd ../demo-angular && tns plugin remove nativescript-connectivity-manager-plugin && tns plugin add ../src"
 	},
 	"keywords": [
+		"IoT",
+		"WifiManager",
+		"ConnectionManager",
+		"Connection",
 		"NativeScript",
 		"JavaScript",
 		"Android",
@@ -36,8 +40,8 @@
 		"TypeScript"
 	],
 	"author": {
-		"name": "David Theobald",
-		"email": "david.theobald@oneiot.de"
+		"name": "OneIoT",
+		"email": "contact@oneiot.de"
 	},
 	"bugs": {
 		"url": "https://github.com/1IoT/nativescript-connectivity-manager-plugin/issues"
