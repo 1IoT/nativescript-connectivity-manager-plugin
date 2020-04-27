@@ -21,9 +21,11 @@ export declare class ConnectivityManagerImpl extends Common {
 
     isGpsConnected(): boolean;
 
+    hasInternet(): boolean;
+
     async scanWifiNetworks(): Promise<string[]>;
 
-    async connectToWifiNetwork(ssid: string, password: string, milliseconds: number): Promise<boolean>
+    async connectToWifiNetwork(ssid: string, password: string, milliseconds: number): Promise<boolean>;
 
-    async disconnectWifiNetwork(): Promise<boolean>
+    async disconnectWifiNetwork(timeoutMs: number): Promise<boolean>
 }

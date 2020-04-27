@@ -2,8 +2,12 @@ import {Common} from './connectivity-manager-impl.common';
 import {ConnectivityManagerInterface} from "./connectivity-manager-interface";
 
 /**
- * It manages the connectivity API of an iOS mobile device.
- */
+* It manages the connectivity API of an iOS mobile device.
+* This is especially thought for applications where an app needs to connect to a Wi-Fi AP for P2P communication.
+* It allows also to switch back to a network with internet connection to also to internet requests.
+ *
+ * TODO if you want to implement this for iOS please make a pull-request =)
+*/
 export class ConnectivityManagerImpl extends Common implements ConnectivityManagerInterface {
 
     public getSSID(): string {
@@ -46,6 +50,12 @@ export class ConnectivityManagerImpl extends Common implements ConnectivityManag
         return undefined;
     }
 
+    public hasInternet(): boolean {
+        //Not implemented yet
+        return undefined
+    }
+
+
     public scanWifiNetworks(): Promise<string[]> {
         // Not implemented yet
         return undefined;
@@ -56,7 +66,8 @@ export class ConnectivityManagerImpl extends Common implements ConnectivityManag
         return undefined;
     }
 
-    public disconnectWifiNetwork(): void {
+    public disconnectWifiNetwork(timeoutMs: number): Promise<boolean>  {
         // Not implemented yet
+        return undefined;
     }
 }

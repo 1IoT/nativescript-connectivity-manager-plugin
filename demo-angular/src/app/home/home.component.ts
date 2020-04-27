@@ -1,5 +1,6 @@
 import {Component, OnInit} from "@angular/core";
 import {ConnectivityManagerImpl} from "../../../../src";
+import {HttpClient} from "@angular/common/http";
 
 @Component({
     selector: "Home",
@@ -7,7 +8,14 @@ import {ConnectivityManagerImpl} from "../../../../src";
 })
 export class HomeComponent implements OnInit {
 
-    constructor(private connectivityManager: ConnectivityManagerImpl) {
+    private static NETWORK_SSID: string = "MY_SSID";
+    private static NETWORK_PASSPHARSE: string = "MY_KEY";
+    private static CONNECTION_TIMEOUT_MS: number = 30000;
+    private static DISCONNECT_TIMEOUT_MS: number = 15000;
+    private static P2P_TEST_URL: string = 'http://test.p2p';
+    private static INTERNET_TEST_URL: string = 'https://www.google.de';
+
+    constructor(private connectivityManager: ConnectivityManagerImpl, private httpClient: HttpClient) {
     }
 
     ngOnInit(): void {
@@ -31,18 +39,39 @@ export class HomeComponent implements OnInit {
         });
     }
 
-    public connect(): void {
+    public async connect(): Promise<boolean> {
         console.log("Start connection...");
         console.log("Disconnect with the source network...");
-        this.connectivityManager.connectToWifiNetwork("", "", 10000).then((connected: boolean) => {
-            console.log("Connected with a new network: " + connected);
-        });
+        return this.connectivityManager.connectToWifiNetwork(HomeComponent.NETWORK_SSID, HomeComponent.NETWORK_PASSPHARSE, HomeComponent.CONNECTION_TIMEOUT_MS);
     }
 
-    public disconnect(): void {
-        this.connectivityManager.disconnectWifiNetwork().then((disconnected) => {
-            console.log("Disconnected: " + disconnected);
-            console.log("Android automatically connects to the source network...");
-        });
+    public async disconnect(): Promise<boolean> {
+        return this.connectivityManager.disconnectWifiNetwork(HomeComponent.DISCONNECT_TIMEOUT_MS);
+    }
+
+    /**
+     * Test flow
+     * Connect P2P -> Perform P2P HTTP Call -> Disconnect -> Perform Internet HTTP Call
+     */
+    public async testFlow(): Promise<void>{
+        let success = await this.connect();
+        console.log("Success: " + success);
+        let result = await this.performP2PCall();
+        console.log("Response: " + JSON.stringify(result));
+        console.log("Disconnecting");
+        let reconnected = await this.disconnect();
+        console.log("Reconnected: " + reconnected);
+        result = await this.performInternetCall();
+        console.log("Response: " + JSON.stringify(result));
+    }
+
+    private async performP2PCall():Promise<Object> {
+        console.log("Running P2P call.");
+        return this.httpClient.get(HomeComponent.P2P_TEST_URL).toPromise();
+    }
+
+    public async performInternetCall():Promise<Object> {
+        console.log("Running internet call.");
+        return this.httpClient.get(HomeComponent.INTERNET_TEST_URL).toPromise();
     }
 }

@@ -68,7 +68,7 @@ export class AppComponent {
     }
 
     public disconnect(): void {
-        this.connectivityManager.disconnectWifiNetwork().then((disconnected) => {
+        this.connectivityManager.disconnectWifiNetwork(5000).then((disconnected) => {
             console.log("Disconnected: " + disconnected);
             console.log("Android automatically connects to the source network...");
         });
@@ -98,9 +98,10 @@ Requires **Android SDK**: 26
 | isCellularConnected() | boolean |  
 | isGpsEnabled() | boolean |
 | isGpsConnected() | boolean |  
+| hasInternet() | boolean | 
 | async scanWifiNetworks() | Promise\<string[]\> | requires granted location permission and enabled gps  
 | async connectToWifiNetwork(ssid: string, password: string, milliseconds: number) | Promise\<boolean\> |  
-| async disconnectWifiNetworkByBroadcast() | Promise\<boolean\>
+| async disconnectWifiNetworkByBroadcast(timeoutMs: number) | Promise\<boolean\>
 
 ## Tips
 

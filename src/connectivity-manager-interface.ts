@@ -19,9 +19,11 @@ export interface ConnectivityManagerInterface {
 
     isGpsConnected(): boolean;
 
+    hasInternet(): boolean;
+
     scanWifiNetworks(): Promise<string[]>;
 
     connectToWifiNetwork(ssid: string, password: string, milliseconds: number): Promise<boolean>
 
-    disconnectWifiNetwork(): void;
+    disconnectWifiNetwork(timeoutMs: number):  Promise<boolean>;
 }
