@@ -203,25 +203,11 @@ export class ConnectivityManagerImpl extends Common implements ConnectivityManag
                 let networkRequest = (new NetworkRequest.Builder()).addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
                     .setNetworkSpecifier(wifiNetworkSpecifier).build();
 
+
                 // the callback
                 // network call back stored in class variable for later disconnect via {@link ConnectivityManagerService#unregisterNetworkCallback}
-                this.forcedNetworkCallback = new class RC extends ConnectivityManagerService.NetworkCallback {
+                this.forcedNetworkCallback = new NetworkCallbackImpl(this.connectivityManager, resolve);
 
-                    // requested networks become available
-                    onAvailable(network: android.net.Network): void {
-                        connectivityManager.bindProcessToNetwork(network);
-                        console.log("Connected to " + ssid);
-
-                        resolve(true);
-                    }
-
-                    // Network not available (timeout)
-                    onUnavailable(): void {
-                        super.onUnavailable();
-                        console.log("Ran into timeout.");
-                        resolve(false);
-                    }
-                };
                 //---------------------------------------------------------------------------
                 //---------- End - Setup the network request and callback -------------------
 
@@ -439,5 +425,26 @@ export class ConnectivityManagerImpl extends Common implements ConnectivityManag
         this.wifiManager.removeNetwork(this.getWifiNetworkId());
 
         this.wifiManager.disconnect();
+    }
+}
+
+class NetworkCallbackImpl extends ConnectivityManagerService.NetworkCallback {
+    constructor(private connectivityManager: ConnectivityManagerService, private callback) {
+        super();
+    }
+
+    // requested networks become available
+    onAvailable(network: android.net.Network): void {
+        this.connectivityManager.bindProcessToNetwork(network);
+        console.log("Connected to the network.");
+
+        this.callback(true);
+    }
+
+    // Network not available (timeout)
+    onUnavailable(): void {
+        super.onUnavailable();
+        console.log("Ran into timeout.");
+        this.callback(false);
     }
 }
