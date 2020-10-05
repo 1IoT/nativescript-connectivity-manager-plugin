@@ -1,5 +1,5 @@
 {
-  "name": "nativescript-connectivity-manager-plugin-ns-7",
+  "name": "nativescript-connectivity-manager-plugin",
   "version": "0.0.6",
   "description": "This plugin provides a connectivity manager of Android and iOS.",
   "main": "connectivity-manager-impl",
@@ -12,14 +12,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/upd4ting/nativescript-connectivity-manager-plugin-ns-7.git"
+    "url": "https://github.com/1IoT/nativescript-connectivity-manager-plugin.git"
   },
   "scripts": {
     "build": "node scripts/build-native.js",
     "demo:reset": "cd ../demo-angular && npx rimraf -- hooks node_modules platforms package-lock.json",
     "demo:ios": "npm i && cd ../demo-angular && tns run ios",
     "demo:android": "npm i && cd ../demo-angular && tns run android --watch",
-    "plugin:prepare": "npm run build && cd ../demo-angular && tns plugin remove nativescript-connectivity-manager-plugin-ns-7 && tns plugin add ../src && cd ../demo-angular && tns plugin remove nativescript-connectivity-manager-plugin-ns-7 && tns plugin add ../src"
+    "plugin:prepare": "npm run build && cd ../demo-angular && tns plugin remove nativescript-connectivity-manager-plugin && tns plugin add ../src && cd ../demo-angular && tns plugin remove nativescript-connectivity-manager-plugin && tns plugin add ../src"
   },
   "keywords": [
     "IoT",

@@ -19,23 +19,23 @@ A plugin to manage the device connectivity on Android and iOS.
 
 ## Installation
 
-`tns plugin add nativescript-connectivity-manager-plugin-ns-7`
+`tns plugin add nativescript-connectivity-manager-plugin`
 
 ## Demo
 
-Check out the [Angular demo app](https://github.com/upd4ting/nativescript-connectivity-manager-plugin-ns-7/blob/master/demo-angular/src/app/home/home.component.ts)
+Check out the [Angular demo app](https://github.com/1IoT/nativescript-connectivity-manager-plugin/blob/master/demo-angular/src/app/home/home.component.ts)
 and run it locally:
 
 ```
-git clone https://github.com/upd4ting/nativescript-connectivity-manager-plugin-ns-7
-cd nativescript-connectivity-manager-plugin-ns-7/src
+git clone https://github.com/1IoT/nativescript-connectivity-manager-plugin
+cd nativescript-connectivity-manager-plugin/src
 npm run demo:android
 ```
 
 ## Usage
 
 ```
-import {ConnectivityManagerImpl} from 'nativescript-connectivity-manager-plugin-ns-7';
+import {ConnectivityManagerImpl} from 'nativescript-connectivity-manager-plugin';
 
 @Component({
     selector: "Home",
