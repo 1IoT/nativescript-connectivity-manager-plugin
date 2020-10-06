@@ -11,7 +11,6 @@ import LocationManagerService = android.location.LocationManager;
 import List = java.util.List;
 import NetworkRequest = android.net.NetworkRequest;
 import NetworkCapabilities = android.net.NetworkCapabilities;
-import WifiNetworkSpecifier = android.net.wifi.WifiNetworkSpecifier;
 import Network = android.net.Network;
 
 /**
@@ -89,8 +88,8 @@ export class ConnectivityManagerImpl
     }
 
     return this.connectivityManager
-      .getNetworkCapabilities(this.connectivityManager.getActiveNetwork())
-      .hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
+      .getNetworkInfo(ConnectivityManagerService.TYPE_WIFI)
+      .isConnected();
   }
 
   /**
@@ -198,11 +197,11 @@ export class ConnectivityManagerImpl
       }
 
       try {
-        // Connectivity manger in local variable to make it available in anonymous class (below)
-        let connectivityManager = this.connectivityManager;
+        // This in local variable to make it available in anonymous class (below)
+        const that = this;
 
         // Determine if the current connection is metered (used for later "reconnect")
-        this.previousConnectionMetered = connectivityManager.isActiveNetworkMetered();
+        this.previousConnectionMetered = this.connectivityManager.isActiveNetworkMetered();
 
         /*
          * Determine if the current connection is a WiFi connection.
@@ -217,36 +216,52 @@ export class ConnectivityManagerImpl
         }
 
         //---------------------------------------------------------------------------
-        //-------- Begin - Setup the network request and callback -------------------
-        // the requested network specifier
-        let wifiNetworkSpecifier = new WifiNetworkSpecifier.Builder()
-          .setSsid(ssid)
-          .setWpa2Passphrase(password)
-          .build();
+        //-------- Begin - Setup the configuration -------------------
+        // Format the ssid for android
+        const ssidFormatted = `"${ssid}"`;
 
-        // the network request
-        let networkRequest = new NetworkRequest.Builder()
-          .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-          .setNetworkSpecifier(wifiNetworkSpecifier)
-          .build();
+        let conf = new WifiConfiguration();
+        conf.SSID = ssidFormatted;
 
-        // the callback
-        // network call back stored in class variable for later disconnect via {@link ConnectivityManagerService#unregisterNetworkCallback}
-        this.forcedNetworkCallback = new NetworkCallbackImpl(
-          this.connectivityManager,
-          resolve
-        );
+        if (password) {
+          conf.preSharedKey = '"' + password + '"';
+        } else {
+          conf.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE);
+        }
 
         //---------------------------------------------------------------------------
-        //---------- End - Setup the network request and callback -------------------
+        //---------- End - Setup the wifi connection with the given timeout -------------------
+        this.wifiManager.addNetwork(conf);
 
-        // Request the network with the given timeout
-        console.log("Connecting to the network...");
-        this.connectivityManager.requestNetwork(
-          networkRequest,
-          this.forcedNetworkCallback,
-          milliseconds
-        );
+        const list = this.wifiManager.getConfiguredNetworks();
+        for (let i = 0; i < list.size(); i++) {
+          const network = list.get(i);
+
+          if (network.SSID === ssidFormatted) {
+            this.wifiManager.disconnect();
+            this.wifiManager.enableNetwork(network.networkId, true);
+            this.wifiManager.reconnect();
+          }
+        }
+
+        let waitTime = 0;
+
+        let timeoutInterval = setInterval(() => {
+          const currentSSID = that.getSSID();
+
+          if (currentSSID === ssid) {
+            clearInterval(timeoutInterval);
+            resolve(true);
+            return;
+          }
+
+          waitTime += 1000;
+
+          if (waitTime >= milliseconds) {
+            clearInterval(timeoutInterval);
+            resolve(false);
+          }
+        }, 1000);
       } catch (error) {
         throw new Error(
           "Something went wrong wile connecting to the WiFi. + " + error
@@ -340,11 +355,6 @@ export class ConnectivityManagerImpl
       this.connectivityManager.registerNetworkCallback(
         new NetworkRequest.Builder().build(),
         networkConnectivity
-      );
-
-      //Disconnect from the intentionally connected network
-      this.connectivityManager.unregisterNetworkCallback(
-        this.forcedNetworkCallback
       );
     });
   }
@@ -458,11 +468,12 @@ export class ConnectivityManagerImpl
   /**
    * Adds a Wi-Fi configuration needed to connect to a network.
    *
+   * @Deprecated The method should not be used
+   *
    * @param ssid of a Wi-Fi access point to be configured.
    * @param password of the Wi-Fi access point to be configured.
    * @returns the networkId that is needed to connect to a network.
    */
-  @Deprecated
   private addNetwork(ssid: string, password: string): number {
     let config: WifiConfiguration = new WifiConfiguration();
     config.SSID = '"' + ssid + '"';
@@ -474,10 +485,11 @@ export class ConnectivityManagerImpl
   /**
    * Wait some seconds until connected to the Wi-Fi.
    *
+   * @Deprecated The method should not be used
+   *
    * @param milliseconds in which the connection is to be established.
    * @returns true if the connection was made within the defined time.
    */
-  @Deprecated
   private async waitUntilConnectedToWifi(
     milliseconds: number
   ): Promise<boolean> {
@@ -507,36 +519,13 @@ export class ConnectivityManagerImpl
   /**
    * Disconnects the connection to the current Wi-Fi and remove the network from the wifiManager list
    * to prevent reconnecting.
+   *
+   * @Deprecated The method should not be used
    */
-  @Deprecated
   private disconnectWifiAndRemoveNetwork(): void {
     // Prevents reconnecting to the network by removing the Wi-Fi configuration
     this.wifiManager.removeNetwork(this.getWifiNetworkId());
 
     this.wifiManager.disconnect();
-  }
-}
-
-class NetworkCallbackImpl extends ConnectivityManagerService.NetworkCallback {
-  constructor(
-    private connectivityManager: ConnectivityManagerService,
-    private callback
-  ) {
-    super();
-  }
-
-  // requested networks become available
-  onAvailable(network: android.net.Network): void {
-    this.connectivityManager.bindProcessToNetwork(network);
-    console.log("Connected to the network.");
-
-    this.callback(true);
-  }
-
-  // Network not available (timeout)
-  onUnavailable(): void {
-    super.onUnavailable();
-    console.log("Ran into timeout.");
-    this.callback(false);
   }
 }
