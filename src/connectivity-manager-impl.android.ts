@@ -11,7 +11,17 @@ import LocationManagerService = android.location.LocationManager;
 import List = java.util.List;
 import NetworkRequest = android.net.NetworkRequest;
 import NetworkCapabilities = android.net.NetworkCapabilities;
+import WifiNetworkSpecifier = android.net.wifi.WifiNetworkSpecifier;
 import Network = android.net.Network;
+
+let IS_Q_VERSION = false;
+
+try {
+  IS_Q_VERSION =
+    android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q;
+} catch {
+  IS_Q_VERSION = false;
+}
 
 /**
  * It manages the connectivity API of an Android mobile device.
@@ -52,10 +62,6 @@ export class ConnectivityManagerImpl
    * @returns the SSID of the current network or <unknown ssid> if the location permission is not granted.
    */
   public getSSID(): string {
-    if (!this.isWifiConnected()) {
-      throw new Error("Not connected to a Wifi.");
-    }
-
     return this.wifiManager.getConnectionInfo().getSSID();
   }
 
@@ -87,9 +93,15 @@ export class ConnectivityManagerImpl
       throw new Error("Wifi is not enabled.");
     }
 
-    return this.connectivityManager
-      .getNetworkInfo(ConnectivityManagerService.TYPE_WIFI)
-      .isConnected();
+    if (IS_Q_VERSION) {
+      return this.connectivityManager
+        .getNetworkCapabilities(this.connectivityManager.getActiveNetwork())
+        .hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
+    } else {
+      return this.connectivityManager
+        .getNetworkInfo(ConnectivityManagerService.TYPE_WIFI)
+        .isConnected();
+    }
   }
 
   /**
@@ -197,6 +209,8 @@ export class ConnectivityManagerImpl
       }
 
       try {
+        // Connectivity manager in local variable to make it available in anonymous class (below)
+        let connectivityManager = this.connectivityManager;
         // This in local variable to make it available in anonymous class (below)
         const that = this;
 
@@ -215,53 +229,103 @@ export class ConnectivityManagerImpl
           this.previousSsid = undefined;
         }
 
-        //---------------------------------------------------------------------------
-        //-------- Begin - Setup the configuration -------------------
-        // Format the ssid for android
-        const ssidFormatted = `"${ssid}"`;
+        /*
+         * Connect to wifi network
+         */
 
-        let conf = new WifiConfiguration();
-        conf.SSID = ssidFormatted;
+        if (IS_Q_VERSION) {
+          // the requested network specifier
+          let wifiNetworkSpecifier = new WifiNetworkSpecifier.Builder()
+            .setSsid(ssid)
+            .setWpa2Passphrase(password)
+            .build();
 
-        if (password) {
-          conf.preSharedKey = '"' + password + '"';
+          // the network request
+          let networkRequest = new NetworkRequest.Builder()
+            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+            .setNetworkSpecifier(wifiNetworkSpecifier)
+            .build();
+
+          // the callback
+          // network call back stored in class variable for later disconnect via {@link ConnectivityManagerService#unregisterNetworkCallback}
+          this.forcedNetworkCallback = new NetworkCallbackImpl(
+            this.connectivityManager,
+            resolve
+          );
+
+          // Request the network with the given timeout
+          console.log("Connecting to the network...");
+          this.connectivityManager.requestNetwork(
+            networkRequest,
+            this.forcedNetworkCallback,
+            milliseconds
+          );
         } else {
-          conf.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE);
-        }
+          // Format ssid for android
+          const ssidFormatted = `"${ssid}"`;
 
-        //---------------------------------------------------------------------------
-        //---------- End - Setup the wifi connection with the given timeout -------------------
-        this.wifiManager.addNetwork(conf);
+          // Configure wifi configuration
+          let conf = new WifiConfiguration();
+          conf.SSID = ssidFormatted;
 
-        const list = this.wifiManager.getConfiguredNetworks();
-        for (let i = 0; i < list.size(); i++) {
-          const network = list.get(i);
+          if (password) {
+            conf.preSharedKey = '"' + password + '"';
+            conf.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.WPA_PSK);
+          } else {
+            conf.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE);
+          }
 
-          if (network.SSID === ssidFormatted) {
+          const list = this.wifiManager.getConfiguredNetworks();
+          let connected = false;
+          for (let i = 0; i < list.size(); i++) {
+            const network = list.get(i);
+
+            if (network.SSID === ssidFormatted) {
+              this.wifiManager.disconnect();
+              this.wifiManager.enableNetwork(network.networkId, true);
+              connected = true;
+              break;
+            }
+          }
+
+          if (!connected) {
             this.wifiManager.disconnect();
-            this.wifiManager.enableNetwork(network.networkId, true);
-            this.wifiManager.reconnect();
+            const netId = this.wifiManager.addNetwork(conf);
+            this.wifiManager.enableNetwork(netId, true);
           }
+
+          let waitTime = 0;
+          let timeoutInterval = setInterval(() => {
+            const currentSSID = that.getSSID();
+
+            if (currentSSID === ssidFormatted) {
+              clearInterval(timeoutInterval);
+
+              const networks = connectivityManager.getAllNetworks();
+              for (let i = 0; i < networks.length; i++) {
+                const network = networks[i];
+                const networkInfo = connectivityManager.getNetworkInfo(network);
+
+                if (
+                  networkInfo.getType() == ConnectivityManagerService.TYPE_WIFI
+                ) {
+                  connectivityManager.bindProcessToNetwork(network);
+                  ConnectivityManagerService.setProcessDefaultNetwork(network);
+                  resolve(true);
+                }
+              }
+
+              return;
+            }
+
+            waitTime += 1000;
+
+            if (waitTime >= milliseconds) {
+              clearInterval(timeoutInterval);
+              resolve(false);
+            }
+          }, 1000);
         }
-
-        let waitTime = 0;
-
-        let timeoutInterval = setInterval(() => {
-          const currentSSID = that.getSSID();
-
-          if (currentSSID === ssid) {
-            clearInterval(timeoutInterval);
-            resolve(true);
-            return;
-          }
-
-          waitTime += 1000;
-
-          if (waitTime >= milliseconds) {
-            clearInterval(timeoutInterval);
-            resolve(false);
-          }
-        }, 1000);
       } catch (error) {
         throw new Error(
           "Something went wrong wile connecting to the WiFi. + " + error
@@ -356,6 +420,13 @@ export class ConnectivityManagerImpl
         new NetworkRequest.Builder().build(),
         networkConnectivity
       );
+
+      if (IS_Q_VERSION) {
+        //Disconnect from the intentionally connected network
+        this.connectivityManager.unregisterNetworkCallback(
+          this.forcedNetworkCallback
+        );
+      }
     });
   }
 
@@ -527,5 +598,29 @@ export class ConnectivityManagerImpl
     this.wifiManager.removeNetwork(this.getWifiNetworkId());
 
     this.wifiManager.disconnect();
+  }
+}
+
+class NetworkCallbackImpl extends ConnectivityManagerService.NetworkCallback {
+  constructor(
+    private connectivityManager: ConnectivityManagerService,
+    private callback
+  ) {
+    super();
+  }
+
+  // requested networks become available
+  onAvailable(network: android.net.Network): void {
+    this.connectivityManager.bindProcessToNetwork(network);
+    console.log("Connected to the network.");
+
+    this.callback(true);
+  }
+
+  // Network not available (timeout)
+  onUnavailable(): void {
+    super.onUnavailable();
+    console.log("Ran into timeout.");
+    this.callback(false);
   }
 }
