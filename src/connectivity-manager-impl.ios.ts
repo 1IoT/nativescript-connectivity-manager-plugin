@@ -13,11 +13,11 @@ export class ConnectivityManagerImpl
     let interfaceNames = <NSArray<string>>CNCopySupportedInterfaces();
 
     for (let i = 0; i < interfaceNames.count; i++) {
-      let info = CNCopyCurrentNetworkInfo(interfaceNames[i]);
+      let info = <NSDictionary<any, any>> CNCopyCurrentNetworkInfo(interfaceNames[i]);
       if (!info) {
         continue;
       }
-      let ssid = info[kCNNetworkInfoKeySSID];
+      let ssid = info.valueForKey(kCNNetworkInfoKeySSID);
       if (!ssid) {
         continue;
       }
@@ -78,7 +78,6 @@ export class ConnectivityManagerImpl
     milliseconds: number
   ): Promise<boolean> {
     return new Promise((resolve, reject) => {
-      let that = this;
       let configuration = NEHotspotConfiguration.new().initWithSSIDPassphraseIsWEP(
         ssid,
         password,

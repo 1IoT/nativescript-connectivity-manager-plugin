@@ -1,6 +1,7 @@
 import { Component, OnInit } from "@angular/core";
 import { ConnectivityManagerImpl } from "../../../../src";
 import { HttpClient } from "@angular/common/http";
+import { isIOS } from "@nativescript/core/platform";
 
 @Component({
     selector: "Home",
@@ -22,6 +23,13 @@ export class HomeComponent implements OnInit {
     ngOnInit(): void {}
 
     public getInfos() {
+        if (isIOS) {
+            let locationManager = CLLocationManager.new();
+
+            locationManager.requestWhenInUseAuthorization(); 
+            locationManager.requestAlwaysAuthorization();
+        }
+
         console.log("Wifi SSID: " + this.connectivityManager.getSSID());
         console.log(
             "NetworkId: " + this.connectivityManager.getWifiNetworkId()
