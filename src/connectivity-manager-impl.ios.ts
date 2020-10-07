@@ -78,12 +78,17 @@ export class ConnectivityManagerImpl
     milliseconds: number
   ): Promise<boolean> {
     return new Promise((resolve, reject) => {
+      let that = this;
       let configuration = NEHotspotConfiguration.new().initWithSSIDPassphraseIsWEP(
         ssid,
         password,
         false
       );
       configuration.joinOnce = true;
+
+      let timeout = setTimeout(() => {
+        resolve(false);
+      }, milliseconds);
 
       NEHotspotConfigurationManager.sharedManager.applyConfigurationCompletionHandler(
         configuration,
@@ -95,6 +100,8 @@ export class ConnectivityManagerImpl
           } else {
             resolve(false);
           }
+
+          clearTimeout(timeout);
         }
       );
     });
