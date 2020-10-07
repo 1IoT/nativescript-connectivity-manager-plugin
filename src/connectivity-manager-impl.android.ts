@@ -310,7 +310,6 @@ export class ConnectivityManagerImpl
                   networkInfo.getType() == ConnectivityManagerService.TYPE_WIFI
                 ) {
                   connectivityManager.bindProcessToNetwork(network);
-                  ConnectivityManagerService.setProcessDefaultNetwork(network);
                   resolve(true);
                 }
               }
@@ -425,6 +424,10 @@ export class ConnectivityManagerImpl
         //Disconnect from the intentionally connected network
         this.connectivityManager.unregisterNetworkCallback(
           this.forcedNetworkCallback
+        );
+      } else {
+        this.wifiManager.disableNetwork(
+          this.wifiManager.getConnectionInfo().getNetworkId()
         );
       }
     });
