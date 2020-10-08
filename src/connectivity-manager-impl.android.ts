@@ -94,9 +94,14 @@ export class ConnectivityManagerImpl
     }
 
     if (IS_Q_VERSION) {
-      return this.connectivityManager
-        .getNetworkCapabilities(this.connectivityManager.getActiveNetwork())
-        .hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
+      return (
+        this.connectivityManager.getNetworkCapabilities(
+          this.connectivityManager.getActiveNetwork()
+        ) &&
+        this.connectivityManager
+          .getNetworkCapabilities(this.connectivityManager.getActiveNetwork())
+          .hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+      );
     } else {
       return this.connectivityManager
         .getNetworkInfo(ConnectivityManagerService.TYPE_WIFI)
@@ -209,8 +214,6 @@ export class ConnectivityManagerImpl
       }
 
       try {
-        // Connectivity manager in local variable to make it available in anonymous class (below)
-        let connectivityManager = this.connectivityManager;
         // This in local variable to make it available in anonymous class (below)
         const that = this;
 
@@ -243,6 +246,7 @@ export class ConnectivityManagerImpl
           // the network request
           let networkRequest = new NetworkRequest.Builder()
             .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+            .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) // For wifi that has no internet
             .setNetworkSpecifier(wifiNetworkSpecifier)
             .build();
 
@@ -267,7 +271,6 @@ export class ConnectivityManagerImpl
           // Configure wifi configuration
           let conf = new WifiConfiguration();
           conf.SSID = ssidFormatted;
-
           if (password) {
             conf.preSharedKey = '"' + password + '"';
             conf.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.WPA_PSK);
@@ -275,13 +278,34 @@ export class ConnectivityManagerImpl
             conf.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE);
           }
 
+          // the network request
+          let networkRequest = new NetworkRequest.Builder()
+            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+            .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) // For wifi that has no internet
+            .build();
+
+          // the callback
+          // network call back stored in class variable for later disconnect via {@link ConnectivityManagerService#unregisterNetworkCallback}
+          this.forcedNetworkCallback = new NetworkCallbackImpl(
+            this.connectivityManager,
+            () => {}
+          );
+
+          // Register network callback
+          this.connectivityManager.registerNetworkCallback(
+            networkRequest,
+            this.forcedNetworkCallback
+          );
+
+          this.wifiManager.disconnect();
+          this.connectivityManager.bindProcessToNetwork(null);
+
           const list = this.wifiManager.getConfiguredNetworks();
           let connected = false;
           for (let i = 0; i < list.size(); i++) {
             const network = list.get(i);
 
             if (network.SSID === ssidFormatted) {
-              this.wifiManager.disconnect();
               this.wifiManager.enableNetwork(network.networkId, true);
               connected = true;
               break;
@@ -289,7 +313,6 @@ export class ConnectivityManagerImpl
           }
 
           if (!connected) {
-            this.wifiManager.disconnect();
             const netId = this.wifiManager.addNetwork(conf);
             this.wifiManager.enableNetwork(netId, true);
           }
@@ -300,20 +323,7 @@ export class ConnectivityManagerImpl
 
             if (currentSSID === ssidFormatted) {
               clearInterval(timeoutInterval);
-
-              const networks = connectivityManager.getAllNetworks();
-              for (let i = 0; i < networks.length; i++) {
-                const network = networks[i];
-                const networkInfo = connectivityManager.getNetworkInfo(network);
-
-                if (
-                  networkInfo.getType() == ConnectivityManagerService.TYPE_WIFI
-                ) {
-                  connectivityManager.bindProcessToNetwork(network);
-                  resolve(true);
-                }
-              }
-
+              resolve(true);
               return;
             }
 
@@ -420,15 +430,16 @@ export class ConnectivityManagerImpl
         networkConnectivity
       );
 
-      if (IS_Q_VERSION) {
-        //Disconnect from the intentionally connected network
-        this.connectivityManager.unregisterNetworkCallback(
-          this.forcedNetworkCallback
-        );
-      } else {
+      //Disconnect from the intentionally connected network
+      this.connectivityManager.unregisterNetworkCallback(
+        this.forcedNetworkCallback
+      );
+
+      if (!IS_Q_VERSION) {
         this.wifiManager.disableNetwork(
           this.wifiManager.getConnectionInfo().getNetworkId()
         );
+        this.connectivityManager.bindProcessToNetwork(null);
       }
     });
   }
@@ -537,23 +548,6 @@ export class ConnectivityManagerImpl
     }
 
     return linkProperties.getInterfaceName();
-  }
-
-  /**
-   * Adds a Wi-Fi configuration needed to connect to a network.
-   *
-   * @Deprecated The method should not be used
-   *
-   * @param ssid of a Wi-Fi access point to be configured.
-   * @param password of the Wi-Fi access point to be configured.
-   * @returns the networkId that is needed to connect to a network.
-   */
-  private addNetwork(ssid: string, password: string): number {
-    let config: WifiConfiguration = new WifiConfiguration();
-    config.SSID = '"' + ssid + '"';
-    config.preSharedKey = '"' + password + '"';
-
-    return this.wifiManager.addNetwork(config);
   }
 
   /**
