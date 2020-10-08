@@ -11,7 +11,7 @@ export class ConnectivityManagerImpl
   implements ConnectivityManagerInterface {
   private previousSsid: string = undefined;
 
-  public getSSID(): string {
+  private getNetworkInfo(): NSDictionary<any, any> {
     let interfaceNames = <NSArray<string>>CNCopySupportedInterfaces();
 
     for (let i = 0; i < interfaceNames.count; i++) {
@@ -25,15 +25,20 @@ export class ConnectivityManagerImpl
       if (!ssid) {
         continue;
       }
-      return ssid;
+      return info;
     }
 
     return null;
   }
 
+  public getSSID(): string {
+    const info = this.getNetworkInfo();
+    return info ? info.valueForKey(kCNNetworkInfoKeySSID) : null;
+  }
+
   public getWifiNetworkId(): number {
-    // Not implemented yet
-    return undefined;
+    const info = this.getNetworkInfo();
+    return info ? info.valueForKey(kCNNetworkInfoKeyBSSID) : null;
   }
 
   public isWifiEnabled(): boolean {
