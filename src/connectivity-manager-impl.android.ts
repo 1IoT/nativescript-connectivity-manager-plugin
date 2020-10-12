@@ -214,8 +214,9 @@ export class ConnectivityManagerImpl
       }
 
       try {
-        // This in local variable to make it available in anonymous class (below)
+        // Local variable to make it available in anonymous class (below)
         const that = this;
+        const connectivityManager = this.connectivityManager;
 
         // Determine if the current connection is metered (used for later "reconnect")
         this.previousConnectionMetered = this.connectivityManager.isActiveNetworkMetered();
@@ -252,10 +253,17 @@ export class ConnectivityManagerImpl
 
           // the callback
           // network call back stored in class variable for later disconnect via {@link ConnectivityManagerService#unregisterNetworkCallback}
-          this.forcedNetworkCallback = new NetworkCallbackImpl(
-            this.connectivityManager,
-            resolve
-          );
+          this.forcedNetworkCallback = new ((ConnectivityManagerService.NetworkCallback as any).extend({
+            onAvailable: function (network: android.net.Network) {
+              console.log('Connected to the network');
+              connectivityManager.bindProcessToNetwork(network);
+              resolve(true);
+            }, 
+            onUnavailable: function () {
+              this.super.onUnavailable();
+              resolve(false);
+            }
+          }))();
 
           // Request the network with the given timeout
           console.log("Connecting to the network...");
@@ -278,62 +286,56 @@ export class ConnectivityManagerImpl
             conf.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.NONE);
           }
 
+          // the timeout
+          let timeoutInterval = setTimeout(() => {
+            resolve(false);
+          }, milliseconds);
+
           // the network request
           let networkRequest = new NetworkRequest.Builder()
             .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-            .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) // For wifi that has no internet
             .build();
 
           // the callback
           // network call back stored in class variable for later disconnect via {@link ConnectivityManagerService#unregisterNetworkCallback}
-          this.forcedNetworkCallback = new NetworkCallbackImpl(
-            this.connectivityManager,
-            () => {}
-          );
+          this.forcedNetworkCallback = new ((ConnectivityManagerService.NetworkCallback as any).extend({
+            onAvailable: function (network: android.net.Network) {
+              if (that.getSSID() == ssidFormatted) {
+                console.log('Connected to the network');
+
+                connectivityManager.bindProcessToNetwork(network);
+                connectivityManager.unregisterNetworkCallback(this);
+
+                resolve(true);
+                clearTimeout(timeoutInterval);
+              }
+            }, 
+            onUnavailable: function () {
+              this.super.onUnavailable();
+            }
+          }))();
 
           // Register network callback
           this.connectivityManager.registerNetworkCallback(
             networkRequest,
             this.forcedNetworkCallback
           );
-
-          this.wifiManager.disconnect();
-          this.connectivityManager.bindProcessToNetwork(null);
-
+          
           const list = this.wifiManager.getConfiguredNetworks();
-          let connected = false;
+          let netId = -1;
           for (let i = 0; i < list.size(); i++) {
             const network = list.get(i);
 
             if (network.SSID === ssidFormatted) {
-              this.wifiManager.enableNetwork(network.networkId, true);
-              connected = true;
+              netId = network.networkId;
               break;
             }
           }
 
-          if (!connected) {
-            const netId = this.wifiManager.addNetwork(conf);
-            this.wifiManager.enableNetwork(netId, true);
+          if (netId == -1) {
+            netId = this.wifiManager.addNetwork(conf);
           }
-
-          let waitTime = 0;
-          let timeoutInterval = setInterval(() => {
-            const currentSSID = that.getSSID();
-
-            if (currentSSID === ssidFormatted) {
-              clearInterval(timeoutInterval);
-              resolve(true);
-              return;
-            }
-
-            waitTime += 1000;
-
-            if (waitTime >= milliseconds) {
-              clearInterval(timeoutInterval);
-              resolve(false);
-            }
-          }, 1000);
+          this.wifiManager.enableNetwork(netId, true);
         }
       } catch (error) {
         throw new Error(
@@ -393,8 +395,8 @@ export class ConnectivityManagerImpl
        * We need to determine a new network with internet traffic, since after calling bindProcessToNetwork, android will not route app traffic automatically through a new network.
        * We therefore need to find the previous network to route traffic through that network again.
        */
-      let networkConnectivity = new (class NC extends ConnectivityManagerService.NetworkCallback {
-        onAvailable(network: android.net.Network): void {
+      let networkConnectivity = new ((ConnectivityManagerService.NetworkCallback as any).extend({
+        onAvailable: function (network: android.net.Network): void {
           ConnectivityManagerImpl.logConnectivityInfo(
             wifiManager,
             connectivityManager,
@@ -417,12 +419,11 @@ export class ConnectivityManagerImpl
             // The network we are aiming for is "stable" so we can safely unregister the callback again.
             connectivityManager.unregisterNetworkCallback(this);
           }
-        }
-
-        onLost(network: android.net.Network): void {
+        },
+        onLost: function (network: android.net.Network): void {
           console.log("Disconnected.");
         }
-      })();
+      }))();
 
       //Register the callback above
       this.connectivityManager.registerNetworkCallback(
@@ -430,16 +431,15 @@ export class ConnectivityManagerImpl
         networkConnectivity
       );
 
-      //Disconnect from the intentionally connected network
-      this.connectivityManager.unregisterNetworkCallback(
-        this.forcedNetworkCallback
-      );
-
-      if (!IS_Q_VERSION) {
+      if (IS_Q_VERSION) {
+        //Disconnect from the intentionally connected network
+        this.connectivityManager.unregisterNetworkCallback(
+          this.forcedNetworkCallback
+        );
+      } else {
         this.wifiManager.disableNetwork(
           this.wifiManager.getConnectionInfo().getNetworkId()
         );
-        this.connectivityManager.bindProcessToNetwork(null);
       }
     });
   }
@@ -595,29 +595,5 @@ export class ConnectivityManagerImpl
     this.wifiManager.removeNetwork(this.getWifiNetworkId());
 
     this.wifiManager.disconnect();
-  }
-}
-
-class NetworkCallbackImpl extends ConnectivityManagerService.NetworkCallback {
-  constructor(
-    private connectivityManager: ConnectivityManagerService,
-    private callback
-  ) {
-    super();
-  }
-
-  // requested networks become available
-  onAvailable(network: android.net.Network): void {
-    this.connectivityManager.bindProcessToNetwork(network);
-    console.log("Connected to the network.");
-
-    this.callback(true);
-  }
-
-  // Network not available (timeout)
-  onUnavailable(): void {
-    super.onUnavailable();
-    console.log("Ran into timeout.");
-    this.callback(false);
   }
 }
