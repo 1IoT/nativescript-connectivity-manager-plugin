@@ -89,30 +89,33 @@ export class ConnectivityManagerImpl
     const that = this;
 
     return new Promise((resolve, reject) => {
-      let configuration = NEHotspotConfiguration.new().initWithSSIDPassphraseIsWEP(
-        ssid,
-        password,
-        false
-      );
+      const hotspot = NEHotspotConfiguration.new();
+      let configuration = password ? hotspot.initWithSSIDPassphraseIsWEP(ssid, password, false) : hotspot.initWithSSID(ssid);
       configuration.joinOnce = true;
 
-      let timeout = setTimeout(() => {
-        resolve(false);
-      }, milliseconds);
+      let currentTime = 0;
+      let interval = setInterval(() => {
+        if (that.getSSID() == ssid) {
+          that.previousSsid = ssid;
+          resolve(true);
+          clearInterval(interval);
+          return;
+        }
+
+        currentTime += 200;
+        if (currentTime >= milliseconds) {
+          resolve(false);
+          clearInterval(interval);
+        }
+      }, 200);
 
       NEHotspotConfigurationManager.sharedManager.applyConfigurationCompletionHandler(
         configuration,
         (err) => {
           if (err && err instanceof NSError) {
             resolve(false);
-          } else if (that.getSSID() == ssid) {
-            that.previousSsid = ssid;
-            resolve(true);
-          } else {
-            resolve(false);
-          }
-
-          clearTimeout(timeout);
+            clearInterval(interval);
+          } 
         }
       );
     });
@@ -134,12 +137,12 @@ export class ConnectivityManagerImpl
           return;
         }
 
-        currentTime += 1000;
+        currentTime += 200;
         if (currentTime >= timeoutMs) {
           resolve(false);
           clearInterval(interval);
         }
-      }, 1000);
+      }, 200);
     });
   }
 }
