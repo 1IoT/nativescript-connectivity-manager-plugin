@@ -3,31 +3,36 @@
 A plugin to manage the device connectivity on Android and iOS.
 
 - [x] Android
-    - [x] WiFi
-    - [x] Cellular
-    - [x] GPS
-    - [ ] Bluetooth
-    - [ ] Grant permissions
-- [ ] iOS
-    - [ ] WiFi
-    - [ ] Cellular
-    - [ ] GPS
-    - [ ] Bluetooth
+  - [x] WiFi
+  - [x] Cellular
+  - [x] GPS
+  - [ ] Bluetooth
+  - [ ] Grant permissions
+- [x] iOS
+  - [x] WiFi
+    - [x] Connect to wifi
+    - [x] Get SSID
+    - [] Others not implemented yet
+  - [ ] Cellular
+  - [ ] GPS
+  - [ ] Bluetooth
 
 ## Installation
 
 `tns plugin add nativescript-connectivity-manager-plugin`
 
 ## Demo
-Check out the [Angular demo app](https://github.com/1IoT/nativescript-connectivity-manager-plugin/blob/master/demo-angular/src/app/home/home.component.ts) 
+
+Check out the [Angular demo app](https://github.com/1IoT/nativescript-connectivity-manager-plugin/blob/master/demo-angular/src/app/home/home.component.ts)
 and run it locally:
+
 ```
 git clone https://github.com/1IoT/nativescript-connectivity-manager-plugin
 cd nativescript-connectivity-manager-plugin/src
 npm run demo:android
-````
+```
 
-## Usage 
+## Usage
 
 ```
 import {ConnectivityManagerImpl} from 'nativescript-connectivity-manager-plugin';
@@ -81,24 +86,25 @@ export class HomeComponent implements OnInit {
 ```
 
 ## API
+
 Requires **Android SDK**: 29
 
 **WARNING: Note that even for scanning WiFi and retrieving the SSID, location permission must be given and GPS must be enabled!**
 
-| Method | Return | Description
-| --- | --- | --- |
-| getSSID() | string | requires granted location permission and enabled gps
-| getWifiNetworkId() | number |  
-| isWifiEnabled() | boolean |  
-| isWifiConnected() | boolean |  
-| isCellularEnabled() | boolean |
-| isCellularConnected() | boolean |  
-| isGpsEnabled() | boolean |
-| isGpsConnected() | boolean |  
-| hasInternet() | boolean | 
-| async scanWifiNetworks() | Promise\<string[]\> | requires granted location permission and enabled gps  
-| async connectToWifiNetwork(ssid: string, password: string, milliseconds: number) | Promise\<boolean\> |  
-| async disconnectWifiNetwork(timeoutMs: number) | Promise\<boolean\>
+| Method                                                                           | Return              | Description                                          |
+| -------------------------------------------------------------------------------- | ------------------- | ---------------------------------------------------- |
+| getSSID()                                                                        | string              | requires granted location permission and enabled gps |
+| getWifiNetworkId()                                                               | number              |
+| isWifiEnabled()                                                                  | boolean             |
+| isWifiConnected()                                                                | boolean             |
+| isCellularEnabled()                                                              | boolean             |
+| isCellularConnected()                                                            | boolean             |
+| isGpsEnabled()                                                                   | boolean             |
+| isGpsConnected()                                                                 | boolean             |
+| hasInternet()                                                                    | boolean             |
+| async scanWifiNetworks()                                                         | Promise\<string[]\> | requires granted location permission and enabled gps |
+| async connectToWifiNetwork(ssid: string, password: string, milliseconds: number) | Promise\<boolean\>  |
+| async disconnectWifiNetwork(timeoutMs: number)                                   | Promise\<boolean\>  |
 
 ## Tips
 

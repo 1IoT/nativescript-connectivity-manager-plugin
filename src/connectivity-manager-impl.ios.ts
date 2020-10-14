@@ -1,73 +1,148 @@
-import {Common} from './connectivity-manager-impl.common';
-import {ConnectivityManagerInterface} from "./connectivity-manager-interface";
+import { Common } from "./connectivity-manager-impl.common";
+import { ConnectivityManagerInterface } from "./connectivity-manager-interface";
 
 /**
-* It manages the connectivity API of an iOS mobile device.
-* This is especially thought for applications where an app needs to connect to a Wi-Fi AP for P2P communication.
-* It allows also to switch back to a network with internet connection to also to internet requests.
- *
- * TODO if you want to implement this for iOS please make a pull-request =)
-*/
-export class ConnectivityManagerImpl extends Common implements ConnectivityManagerInterface {
+ * It manages the connectivity API of an iOS mobile device.
+ * This is especially thought for applications where an app needs to connect to a Wi-Fi AP for P2P communication.
+ * It allows also to switch back to a network with internet connection to also to internet requests.
+ */
+export class ConnectivityManagerImpl
+  extends Common
+  implements ConnectivityManagerInterface {
+  private previousSsid: string = undefined;
 
-    public getSSID(): string {
-        // Not implemented yet
-        return undefined;
+  private getNetworkInfo(): NSDictionary<any, any> {
+    let interfaceNames = <NSArray<string>>CNCopySupportedInterfaces();
+
+    for (let i = 0; i < interfaceNames.count; i++) {
+      let info = <NSDictionary<any, any>>(
+        CNCopyCurrentNetworkInfo(interfaceNames[i])
+      );
+      if (!info) {
+        continue;
+      }
+      let ssid = info.valueForKey(kCNNetworkInfoKeySSID);
+      if (!ssid) {
+        continue;
+      }
+      return info;
     }
 
-    public getWifiNetworkId(): number {
-        // Not implemented yet
-        return undefined;
-    }
+    return null;
+  }
 
-    public isWifiEnabled(): boolean {
-        // Not implemented yet
-        return undefined;
-    }
+  public getSSID(): string {
+    const info = this.getNetworkInfo();
+    return info ? info.valueForKey(kCNNetworkInfoKeySSID) : null;
+  }
 
-    public isWifiConnected(): boolean {
-        // Not implemented yet
-        return undefined;
-    }
+  public getWifiNetworkId(): number {
+    const info = this.getNetworkInfo();
+    return info ? info.valueForKey(kCNNetworkInfoKeyBSSID) : null;
+  }
 
-    public isCellularEnabled(): boolean {
-        // Not implemented yet
-        return undefined;
-    }
+  public isWifiEnabled(): boolean {
+    // Not implemented yet
+    return undefined;
+  }
 
-    public isCellularConnected(): boolean {
-        // Not implemented yet
-        return undefined;
-    }
+  public isWifiConnected(): boolean {
+    // Not implemented yet
+    return undefined;
+  }
 
-    public isGpsEnabled(): boolean {
-        // Not implemented yet
-        return undefined;
-    }
+  public isCellularEnabled(): boolean {
+    // Not implemented yet
+    return undefined;
+  }
 
-    public isGpsConnected(): boolean {
-        // Not implemented yet
-        return undefined;
-    }
+  public isCellularConnected(): boolean {
+    // Not implemented yet
+    return undefined;
+  }
 
-    public hasInternet(): boolean {
-        //Not implemented yet
-        return undefined
-    }
+  public isGpsEnabled(): boolean {
+    // Not implemented yet
+    return undefined;
+  }
 
+  public isGpsConnected(): boolean {
+    // Not implemented yet
+    return undefined;
+  }
 
-    public scanWifiNetworks(): Promise<string[]> {
-        // Not implemented yet
-        return undefined;
-    }
+  public hasInternet(): boolean {
+    //Not implemented yet
+    return undefined;
+  }
 
-    public async connectToWifiNetwork(ssid: string, password: string, milliseconds: number): Promise<boolean> {
-        // Not implemented yet
-        return undefined;
-    }
+  public scanWifiNetworks(): Promise<string[]> {
+    // Not implemented yet
+    return undefined;
+  }
 
-    public disconnectWifiNetwork(timeoutMs: number): Promise<boolean>  {
-        // Not implemented yet
-        return undefined;
-    }
+  public connectToWifiNetwork(
+    ssid: string,
+    password: string,
+    milliseconds: number
+  ): Promise<boolean> {
+    const that = this;
+
+    return new Promise((resolve, reject) => {
+      const hotspot = NEHotspotConfiguration.new();
+      let configuration = password ? hotspot.initWithSSIDPassphraseIsWEP(ssid, password, false) : hotspot.initWithSSID(ssid);
+      configuration.joinOnce = true;
+
+      let currentTime = 0;
+      let interval = setInterval(() => {
+        if (that.getSSID() == ssid) {
+          that.previousSsid = ssid;
+          resolve(true);
+          clearInterval(interval);
+          return;
+        }
+
+        currentTime += 200;
+        if (currentTime >= milliseconds) {
+          resolve(false);
+          clearInterval(interval);
+        }
+      }, 200);
+
+      NEHotspotConfigurationManager.sharedManager.applyConfigurationCompletionHandler(
+        configuration,
+        (err) => {
+          if (err && err instanceof NSError) {
+            resolve(false);
+            clearInterval(interval);
+          } 
+        }
+      );
+    });
+  }
+
+  public disconnectWifiNetwork(timeoutMs: number): Promise<boolean> {
+    const that = this;
+    return new Promise<boolean>((resolve) => {
+      let currentTime = 0;
+
+      NEHotspotConfigurationManager.sharedManager.removeConfigurationForSSID(
+        this.previousSsid
+      );
+
+      let interval = setInterval(() => {
+        if (that.getSSID() != that.previousSsid) {
+          resolve(true);
+          clearInterval(interval);
+          return;
+        }
+
+        currentTime += 200;
+        if (currentTime >= timeoutMs) {
+          resolve(false);
+          clearInterval(interval);
+        }
+      }, 200);
+    });
+  }
 }

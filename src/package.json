@@ -1,63 +1,66 @@
 {
-	"name": "nativescript-connectivity-manager-plugin",
-	"version": "0.0.5",
-	"description": "This plugin provides a connectivity manager of Android and iOS.",
-	"main": "connectivity-manager-impl",
-	"typings": "index.d.ts",
-	"nativescript": {
-		"platforms": {
-			"android": "6.0.0",
-			"ios": "6.0.1"
-		}
-	},
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/1IoT/nativescript-connectivity-manager-plugin.git"
-	},
-	"scripts": {
-		"build": "node scripts/build-native.js",
-		"demo:reset": "cd ../demo-angular && npx rimraf -- hooks node_modules platforms package-lock.json",
-		"demo:ios": "npm i && cd ../demo-angular && tns run ios",
-		"demo:android": "npm i && cd ../demo-angular && tns run android --watch",
-		"plugin:prepare": "npm run build && cd ../demo-angular && tns plugin remove nativescript-connectivity-manager-plugin && tns plugin add ../src && cd ../demo-angular && tns plugin remove nativescript-connectivity-manager-plugin && tns plugin add ../src"
-	},
-	"keywords": [
-		"IoT",
-		"WifiManager",
-		"ConnectionManager",
-		"Connection",
-		"NativeScript",
-		"JavaScript",
-		"Android",
-		"iOS",
-		"Connectivity",
-		"Wifi",
-		"Bluetooth",
-		"GPS",
-		"Cellular",
-		"Mobile",
-		"Network",
-		"TypeScript"
-	],
-	"author": {
-		"name": "OneIoT",
-		"email": "contact@oneiot.de"
-	},
-	"bugs": {
-		"url": "https://github.com/1IoT/nativescript-connectivity-manager-plugin/issues"
-	},
-	"license": "Apache-2.0",
-	"homepage": "https://www.oneiot.de/en/",
-	"devDependencies": {
-		"nativescript-dev-webpack": "^1.4.0",
-		"prompt": "^1.0.0",
-		"rimraf": "^2.6.3",
-		"semver": "^5.6.0",
-		"tns-core-modules": "^6.0.0",
-		"tns-platform-declarations": "^6.0.0",
-		"tslint": "^5.12.1",
-		"typescript": "~3.4.5"
-	},
-	"dependencies": {},
-	"bootstrapper": "nativescript-plugin-seed"
+  "name": "nativescript-connectivity-manager-plugin",
+  "version": "0.0.6",
+  "description": "This plugin provides a connectivity manager of Android and iOS.",
+  "main": "connectivity-manager-impl",
+  "typings": "index.d.ts",
+  "nativescript": {
+    "platforms": {
+      "android": "7.0.0",
+      "ios": "7.0.0"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/1IoT/nativescript-connectivity-manager-plugin.git"
+  },
+  "scripts": {
+    "build": "node scripts/build-native.js",
+    "demo:reset": "cd ../demo-angular && npx rimraf -- hooks node_modules platforms package-lock.json",
+    "demo:ios": "npm i && cd ../demo-angular && tns run ios",
+    "demo:android": "npm i && cd ../demo-angular && tns run android --watch",
+    "plugin:prepare": "npm run build && cd ../demo-angular && tns plugin remove nativescript-connectivity-manager-plugin && tns plugin add ../src && cd ../demo-angular && tns plugin remove nativescript-connectivity-manager-plugin && tns plugin add ../src"
+  },
+  "keywords": [
+    "IoT",
+    "WifiManager",
+    "ConnectionManager",
+    "Connection",
+    "NativeScript",
+    "JavaScript",
+    "Android",
+    "iOS",
+    "Connectivity",
+    "Wifi",
+    "Bluetooth",
+    "GPS",
+    "Cellular",
+    "Mobile",
+    "Network",
+    "TypeScript"
+  ],
+  "author": {
+    "name": "OneIoT",
+    "email": "contact@oneiot.de"
+  },
+  "contributors": [
+    "Upd4ting (Antony Rizzitelli)"
+  ],
+  "bugs": {
+    "url": "https://github.com/1IoT/nativescript-connectivity-manager-plugin/issues"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://www.oneiot.de/en/",
+  "devDependencies": {
+    "@nativescript/core": "~7.0.0",
+    "@nativescript/types": "~7.0.0",
+    "@nativescript/webpack": "~3.0.0",
+    "prompt": "^1.0.0",
+    "rimraf": "^2.6.3",
+    "semver": "^5.6.0",
+    "tslint": "^5.12.1",
+    "typescript": "~3.9.0"
+  },
+  "dependencies": {},
+  "bootstrapper": "nativescript-plugin-seed"
 }
