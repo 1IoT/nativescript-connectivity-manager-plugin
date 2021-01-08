@@ -106,6 +106,8 @@ Requires **Android SDK**: 29
 | async connectToWifiNetwork(ssid: string, password: string, milliseconds: number) | Promise\<boolean\>  |
 | async disconnectWifiNetwork(timeoutMs: number)                                   | Promise\<boolean\>  |
 
+Do grant permissions (location permissions) please use the [nativescript-advanced-permissions plugin](https://market.nativescript.org/plugins/nativescript-advanced-permissions/) or implement another mechanism. IMHO, dealing with permissions should not be done on plugin level but on application level instead.
+
 ## Tips
 
 - Docs about the [tns-platform-declarations](https://github.com/NativeScript/NativeScript/tree/master/tns-platform-declarations)
