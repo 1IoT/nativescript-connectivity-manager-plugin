@@ -118,10 +118,10 @@
   dependencies:
     tslib "^2.0.0"
 
-"@angular/core@~10.1.3":
-  version "10.1.4"
-  resolved "https://registry.yarnpkg.com/@angular/core/-/core-10.1.4.tgz#1180370e335371a0c36f05c2e8142c926a362836"
-  integrity sha512-GEJkwHG0TPylEkcPj55Ps7f9ryXAwxCDZlv+djSHnOOPjjW8jovgUSg88SRNOJ8pKSjMd8x9yeTQz5fCWaeniw==
+"@angular/core@~11.0.5":
+  version "11.0.5"
+  resolved "https://registry.yarnpkg.com/@angular/core/-/core-11.0.5.tgz#b8c448c3cd4f6dae7327cc1ba4ee2aa29c8dbc26"
+  integrity sha512-XAXWQi7R3ucZXQwx9QK5jSKJeQyRJ53u2dQDpr7R5stzeCy1a5hrNOkZLg9zOTTPcth/6+FrOrRZP9SMdxtw3w==
   dependencies:
     tslib "^2.0.0"
 
@@ -3653,7 +3653,7 @@ nanomatch@^1.2.9:
     to-regex "^3.0.1"
 
 "nativescript-connectivity-manager-plugin@file:../src":
-  version "0.0.6"
+  version "0.0.7"
 
 nativescript-intl@^4.0.0:
   version "4.0.2"
